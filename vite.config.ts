@@ -7,4 +7,13 @@ export default defineConfig({
   build: {
     outDir: 'docs',
   },
+  server: {
+    proxy: {
+      '/api/qwen': {
+        target: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/qwen/, ''),
+      },
+    },
+  },
 })
