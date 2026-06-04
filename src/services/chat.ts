@@ -39,8 +39,12 @@ export async function sendMessage(
   history: ChatMessage[] = [],
   onChunk?: (chunk: string) => void,
 ): Promise<string> {
-  const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+  // Production (GitHub Pages): always use local simulation
+  if (import.meta.env.PROD) {
+    return simulateResponse(userMessage);
+  }
 
+  const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
   if (!apiKey || apiKey === 'your_deepseek_api_key_here') {
     return simulateResponse(userMessage);
   }
