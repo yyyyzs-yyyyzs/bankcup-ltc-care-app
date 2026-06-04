@@ -1,15 +1,11 @@
-// 通义千问 (Qwen) API 服务
-// 通过本地代理转发，避免 CORS + 保护 API Key
+// DeepSeek API 服务
+// 通过本地 Vite 代理转发，避免 CORS + 保护 API Key
 
-const API_BASE = '/api/qwen';
+const API_BASE = '/api/deepseek';
 
-interface QwenMessage {
+interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
-}
-
-interface QwenResponse {
-  choices: { message: { content: string } }[];
 }
 
 const SYSTEM_PROMPT = `你是"厦门银行银龄服务平台"的智能客服助手，名字叫"银龄小助手"。
@@ -30,29 +26,28 @@ const SYSTEM_PROMPT = `你是"厦门银行银龄服务平台"的智能客服助�
 - 家庭照护监管：子女查看服务流水、费用账单、异常提醒
 
 银行客户有三档权益：基础客户（开户即享）、进阶客户（持续缴存）、尊享客户（长期客户）。
-市场上原价与银行客户优惠价有差距，例如：上门助浴市场价150元→客户价120元，陪诊市场价220元→客户价180元。
+价格举例：上门助浴市场价150元→客户价120元，陪诊市场价220元→客户价180元。
 
-回复要求：
-1. 简洁、具体、实用（不超过200字）
-2. 涉及服务推荐时，明确写出服务名称和价格范围
+规则：
+1. 简洁具体，不超过200字
+2. 涉及服务时写出服务名称和参考价格
 3. 涉及长护险时，提醒以医保局正式评定为准
-4. 遇到不清楚的问题，建议拨打平台热线或咨询社区工作人员`;
+4. 不清楚的问题，建议拨打平台热线`;
 
 export async function sendMessage(
   userMessage: string,
-  history: QwenMessage[] = [],
+  history: ChatMessage[] = [],
   onChunk?: (chunk: string) => void,
 ): Promise<string> {
-  const apiKey = import.meta.env.VITE_QWEN_API_KEY;
+  const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
 
-  // 如果没有 API Key，使用本地模拟
-  if (!apiKey || apiKey === 'your_qwen_api_key_here') {
+  if (!apiKey || apiKey === 'your_deepseek_api_key_here') {
     return simulateResponse(userMessage);
   }
 
-  const messages: QwenMessage[] = [
+  const messages: ChatMessage[] = [
     { role: 'system', content: SYSTEM_PROMPT },
-    ...history,
+    ...history.slice(-10),
     { role: 'user', content: userMessage },
   ];
 
@@ -64,7 +59,7 @@ export async function sendMessage(
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'qwen-plus',
+        model: 'deepseek-chat',
         messages,
         temperature: 0.7,
         max_tokens: 800,
@@ -73,13 +68,14 @@ export async function sendMessage(
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errText = await response.text().catch(() => '');
+      console.error('DeepSeek error:', response.status, errText);
+      throw new Error(`API error ${response.status}`);
     }
 
     if (onChunk) {
-      // Streaming mode
       const reader = response.body?.getReader();
-      if (!reader) throw new Error('No reader');
+      if (!reader) throw new Error('No stream reader');
       const decoder = new TextDecoder();
       let fullText = '';
 
@@ -98,24 +94,21 @@ export async function sendMessage(
               fullText += content;
               onChunk(content);
             }
-          } catch {
-            // skip parse errors
-          }
+          } catch { /* skip */ }
         }
       }
       return fullText;
     } else {
-      const data: QwenResponse = await response.json();
-      return data.choices[0]?.message?.content || '抱歉，我暂时无法回复，请稍后再试。';
+      const data = await response.json();
+      return data.choices[0]?.message?.content || '抱歉，暂时无法回复。';
     }
   } catch (error) {
-    console.error('Qwen API error:', error);
-    // Fallback to simulation
+    console.error('DeepSeek API error:', error);
     return simulateResponse(userMessage);
   }
 }
 
-// 本地模拟回复（无 API Key 时使用）
+// 本地模拟回复（无 API Key 时自动降级）
 import { getChatResponse } from '../data/chatData';
 
 function simulateResponse(userMessage: string): Promise<string> {

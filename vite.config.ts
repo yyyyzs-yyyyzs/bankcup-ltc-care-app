@@ -9,10 +9,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api/qwen': {
-        target: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      '/api/deepseek': {
+        target: 'https://api.deepseek.com/v1',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/qwen/, ''),
+        rewrite: (path) => path.replace(/^\/api\/deepseek/, ''),
       },
     },
   },
